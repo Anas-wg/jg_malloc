@@ -99,41 +99,12 @@ int mm_init(void)
     return 0;
 }
 
-static void *extend_heap(size_t words){
-    char *bp; // 블록 포인터
-    size_t size; // size
-
-    // 정렬 유지 위해 짝수로 변환, 홀수면 1 더해서 활용
-    size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
-    if((long)(bp = mem_sbrk(size)) == -1){
-        return NULL;
-    }
-
-    // 가용 블록의 헤더/푸터, 에블로그 헤더 초기화
-    PUT(HDRP(bp), PACK(size, 0)); // 블록 헤더
-    PUT(FTRP(bp), PACK(size, 0)); // 블록 푸터
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // 새로운 에필로그 헤더
-
-    // 이전 블럭도 가용상태라면 병합
-    return coalesce(bp);
-}
-
 /*
  * mm_malloc - Allocate a block by incrementing the brk pointer.
  *     Always allocate a block whose size is a multiple of the alignment.
  */
 void *mm_malloc(size_t size)
 {
-    // int newsize = ALIGN(size + SIZE_T_SIZE);
-    // void *p = mem_sbrk(newsize);
-    // if (p == (void *)-1)
-    //     return NULL;
-    // else
-    // {
-    //     *(size_t *)p = size;
-    //     return (void *)((char *)p + SIZE_T_SIZE);
-    // }
-
     size_t asize;
     size_t extendsize;
     char *bp;
@@ -153,7 +124,7 @@ void *mm_malloc(size_t size)
     }
 
     // 가용 블록 탐색(First Fit)
-    if ((bp = first_fit(asize)) != NULL) {
+    if ((bp = next_fit(asize)) != NULL) {
         place(bp, asize);  // 블록 배치 및 분할
         return bp;
     }
@@ -166,6 +137,61 @@ void *mm_malloc(size_t size)
     place(bp, asize);
     return bp;
 }
+
+/*
+ * mm_free - Freeing a block does nothing.
+ */
+void mm_free(void *bp)
+{
+    // 해제하려는 블록 사이즈 알기
+    size_t size = GET_SIZE(HDRP(bp));
+
+    PUT(HDRP(bp), PACK(size, 0)); // 헤제하려는 블록 헤더
+    PUT(FTRP(bp), PACK(size, 0)); // 헤제하려는 블록 푸터
+    coalesce(bp); // 4가지 케이스 병합 체크
+}
+
+/*
+ * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
+ */
+void *mm_realloc(void *ptr, size_t size)
+{
+    void *oldptr = ptr;
+    void *newptr;
+    size_t copySize;
+
+    newptr = mm_malloc(size);
+    if (newptr == NULL)
+        return NULL;
+    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    if (size < copySize)
+        copySize = size;
+    memcpy(newptr, oldptr, copySize);
+    mm_free(oldptr);
+    return newptr;
+}
+
+
+static void *extend_heap(size_t words){
+    char *bp; // 블록 포인터
+    size_t size; // size
+
+    // 정렬 유지 위해 짝수로 변환, 홀수면 1 더해서 활용
+    size = (words % 2) ? (words + 1) * WSIZE : words * WSIZE;
+    if((long)(bp = mem_sbrk(size)) == -1){
+        return NULL;
+    }
+
+    // 가용 블록의 헤더/푸터, 에블로그 헤더 초기화
+    PUT(HDRP(bp), PACK(size, 0)); // 블록 헤더
+    PUT(FTRP(bp), PACK(size, 0)); // 블록 푸터
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // 새로운 에필로그 헤더
+
+    // 이전 블럭도 가용상태라면 병합
+    return coalesce(bp);
+}
+
+
 
 static void *last_fitp = NULL; // 마지막 탐색 위치 저장용
 
@@ -219,18 +245,6 @@ static void place(void *bp, size_t asize) {
 
 
 
-/*
- * mm_free - Freeing a block does nothing.
- */
-void mm_free(void *bp)
-{
-    // 해제하려는 블록 사이즈 알기
-    size_t size = GET_SIZE(HDRP(bp));
-
-    PUT(HDRP(bp), PACK(size, 0)); // 헤제하려는 블록 헤더
-    PUT(FTRP(bp), PACK(size, 0)); // 헤제하려는 블록 푸터
-    coalesce(bp); // 4가지 케이스 병합 체크
-}
 
 static void *coalesce(void *bp){
 
@@ -262,27 +276,6 @@ static void *coalesce(void *bp){
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    // last_fitp = bp;
+    last_fitp = bp;
     return bp;
 }
-
-/*
- * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
- */
-void *mm_realloc(void *ptr, size_t size)
-{
-    void *oldptr = ptr;
-    void *newptr;
-    size_t copySize;
-
-    newptr = mm_malloc(size);
-    if (newptr == NULL)
-        return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)
-        copySize = size;
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
-}
-
