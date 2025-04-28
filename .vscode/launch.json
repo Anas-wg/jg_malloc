@@ -2,14 +2,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug mdriver",
+            "name": "Debug mdriver", 
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/malloc-lab/mdriver",
             "args": [
                 "-V",
                 "-f",
-                "short1-bal.rep",
+                "short1-bal.rep", // 바꾸면서 실행?
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/malloc-lab",
@@ -23,7 +23,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "Build mdriver"
+            "preLaunchTask": "Build mdriver" // 명령어 실행전 할 것들
         }
     ]
 }
